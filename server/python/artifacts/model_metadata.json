@@ -1,0 +1,80 @@
+{
+  "random_state": 42,
+  "forecast_horizon_days": 7,
+  "hot_demand_threshold": 7,
+  "target_definition": "future_7d_qty",
+  "recommendation_thresholds": {
+    "hot_zone_units_gte": 14,
+    "warm_zone_units_gte": 7
+  },
+  "feature_columns": [
+    "SKU",
+    "product_name",
+    "avg_price",
+    "avg_paid",
+    "avg_discount_pct",
+    "avg_discount_rub",
+    "promo_count",
+    "days_since_sale",
+    "dow",
+    "dom",
+    "weekofyear",
+    "month",
+    "is_weekend",
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_7",
+    "lag_14",
+    "roll_mean_3",
+    "roll_mean_7",
+    "roll_mean_14",
+    "roll_mean_28",
+    "roll_std_3",
+    "roll_std_7",
+    "roll_std_14",
+    "roll_std_28",
+    "roll_sum_3",
+    "roll_sum_7",
+    "roll_sum_14",
+    "roll_sum_28"
+  ],
+  "categorical_mappings": {
+    "SKU": {
+      "1849632149": 0,
+      "1853367094": 1,
+      "3060042378": 2,
+      "3173492114": 3,
+      "3233819091": 4,
+      "3329265055": 5,
+      "3329265170": 6,
+      "3329265278": 7,
+      "3498266574": 8,
+      "3628891267": 9
+    },
+    "product_name": {
+      "Брелок Скелет Майнкрафт (Minecraft)": 0,
+      "Брелок Эндермен Майнкрафт (Minecraft)": 1,
+      "Дань Хэн Тэн Хуан (набор из 16 предметов)": 2,
+      "Держатель для телефона Котёнок подставка для смартфона, белая": 3,
+      "Значок на рюкзак, пиджак,одежду,пин": 4,
+      "держатель для наушников на стол": 5
+    }
+  },
+  "best_params": {
+    "max_depth": 3,
+    "learning_rate": 0.05,
+    "n_estimators": 300,
+    "subsample": 0.9,
+    "colsample_bytree": 0.9,
+    "min_child_weight": 1
+  },
+  "dataset_summary": {
+    "raw_orders_after_cancel_filter": 3286,
+    "daily_rows_dense": 900,
+    "model_rows": 612,
+    "date_min": "2026-01-22",
+    "date_max": "2026-04-21",
+    "unique_sku": 10
+  }
+}

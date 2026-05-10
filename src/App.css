@@ -1,0 +1,85 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.add-rack, .add-cargo, .cargo-search, .generate-qr {
+  margin-bottom: 20px;
+}
+
+.add-rack h2, .add-cargo h2, .cargo-search h2, .generate-qr h2 {
+  margin-bottom: 10px;
+}
+
+.add-rack select, .add-rack input, .add-cargo select, .add-cargo input, .cargo-search input, .generate-qr select {
+  margin-right: 10px;
+  margin-bottom: 10px;
+  padding: 5px;
+}
+
+.add-rack button, .add-cargo button, .cargo-search button, .generate-qr button {
+  padding: 5px 10px;
+  cursor: pointer;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 3px;
+}
+
+.add-rack button:hover, .add-cargo button:hover, .cargo-search button:hover, .generate-qr button:hover {
+  background-color: #0056b3;
+}
+
+.add-rack button:disabled, .add-cargo button:disabled, .cargo-search button:disabled, .generate-qr button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.warehouse-structure {
+  margin-top: 20px;
+}
+
+.warehouse-structure h3 {
+  margin-top: 10px;
+}
+
+.warehouse-structure ul {
+  margin-left: 20px;
+}
+
+.cargo-search ul {
+  list-style: none;
+  padding: 0;
+}
+
+.cargo-search ul li button {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  padding: 5px;
+  text-align: left;
+  width: 100%;
+}
+
+.cargo-search ul li button:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.qr-code {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.qr-code a {
+  display: block;
+  margin-top: 10px;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.qr-code a:hover {
+  text-decoration: underline;
+}
