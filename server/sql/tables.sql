@@ -118,10 +118,26 @@ CREATE TABLE IF NOT EXISTS placement_log (
     FOREIGN KEY (bin_id) REFERENCES bin(id)
 );
 
+CREATE TABLE IF NOT EXISTS forecast (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    cargo_id                INTEGER,                    -- может быть NULL, пока не связали
+    sku                     TEXT UNIQUE NOT NULL,
+    product_name            TEXT NOT NULL,
+    history_last_date       TEXT,
+    forecast_horizon_days   INTEGER DEFAULT 7,
+    predicted_units_next_7_days REAL NOT NULL,
+    recommended_zone        TEXT CHECK (recommended_zone IN ('hot_zone', 'warm_zone', 'cold_zone')),
+    last_calculated         TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cargo_id) REFERENCES cargo(id) ON DELETE SET NULL
+);
+
 -- Индексы
 CREATE INDEX IF NOT EXISTS idx_cargo_name ON cargo(name);
 CREATE INDEX IF NOT EXISTS idx_bin_cargo ON bin_cargo(bin_id, cargo_id);
 CREATE INDEX IF NOT EXISTS idx_sensor_reading ON sensor_reading(sensor_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_placement_log ON placement_log(cargo_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_forecast_sku ON forecast(sku);
+CREATE INDEX IF NOT EXISTS idx_forecast_zone ON forecast(recommended_zone);
+CREATE INDEX IF NOT EXISTS idx_forecast_cargo ON forecast(cargo_id);
 
 PRAGMA foreign_keys = ON;

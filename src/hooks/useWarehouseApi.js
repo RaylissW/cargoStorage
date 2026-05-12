@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const useWarehouseApi = () => {
   const [structure, setStructure] = useState([]);
@@ -390,18 +390,34 @@ const getBinQRUrl = async (binId, type = 'link') => {
   }
 };
 
-return {
-  structure,
-  error,
-  createRack,
-  updateRack,
-  deleteRack,
-  createCargo,
-  deleteCargo,
-  assignCargoToBin,
-  searchCargo,
-  getBinQRUrl
-};
+  const fetchForecasts = useCallback(async () => {
+    const res = await fetch('http://localhost:3000/api/forecast');
+    if (!res.ok) throw new Error('Failed to fetch forecasts');
+    return await res.json();
+  }, []);
+
+  const getRecommendedBins = useCallback(async (cargoName) => {
+    const res = await fetch(
+        `http://localhost:3000/api/bin/recommend?cargoName=${encodeURIComponent(cargoName)}`
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }, []);
+
+  return {
+    structure,
+    error,
+    createRack,
+    updateRack,
+    deleteRack,
+    createCargo,
+    deleteCargo,
+    assignCargoToBin,
+    searchCargo,
+    getBinQRUrl,
+    fetchForecasts,
+    getRecommendedBins
+  };
 };
 
 export default useWarehouseApi;

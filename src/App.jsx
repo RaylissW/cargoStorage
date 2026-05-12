@@ -7,10 +7,12 @@ import WarehouseStructure from './components/WarehouseStructure';
 import AddCargoForm from './components/AddCargoForm';
 import CargoSearch from './components/CargoSearch';
 import GenerateBinQR from './components/GenerateBinQR';
+import ForecastDisplay from "./components/ForecastDisplay.jsx";
 function App() {
     const { structure, error, createRack, updateRack, deleteRack, deleteCargo, createCargo, assignCargoToBin, searchCargo, getBinQRUrl } = useWarehouseApi();
     const [rackData, setRackData] = useState({ warehouse_id: '', name: '', floors: '' });
     const [editRack, setEditRack] = useState(null);
+
     const handleSubmitRack = async () => {
         if (editRack) {
             console.log(editRack)
@@ -72,6 +74,7 @@ function App() {
             onEditRack={handleEditRack}
             onDeleteRack={handleDeleteRack}
         />
+        <ForecastDisplay />
     </div>);
 }
 export default App;

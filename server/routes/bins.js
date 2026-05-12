@@ -1,4 +1,3 @@
-
 import express from 'express';
 import { db } from '../db/init.js';
 import qr from 'qr-image';
@@ -245,5 +244,67 @@ router.post('/bin_cargo', (req, res) => {
     }
   );
 });
+
+router.get('/recommend', async (req, res) => {
+  const { cargoName } = req.query;
+
+  if (!cargoName) {
+    return res.status(400).json({ error: 'Укажите cargoName' });
+  }
+
+  console.log(`🔍 Рекомендация ячеек для груза: "${cargoName}"`);
+
+  // 1. Получаем прогноз для этого товара
+  const forecastSql = `
+        SELECT recommended_zone 
+        FROM forecast 
+        WHERE LOWER(product_name) = LOWER(?)
+        ORDER BY last_calculated DESC 
+        LIMIT 1
+    `;
+
+  db.get(forecastSql, [cargoName], (err, forecast) => {
+    if (err || !forecast) {
+      // Если прогноза нет — возвращаем обычные свободные ячейки
+      return getFreeBins(res, null);
+    }
+
+    getFreeBins(res, forecast.recommended_zone);
+  });
+});
+
+function getFreeBins(res, preferredZone = null) {
+  const sql = `
+        SELECT 
+            w.name AS warehouse,
+            r.name AS rack,
+            s.level AS shelf,
+            b.cell_number AS cell,
+            b.id AS bin_id,
+            (b.max_volume - b.current_volume) AS free_volume,
+            ? AS recommended_zone
+        FROM bin b
+        JOIN shelf s ON b.shelf_id = s.id
+        JOIN rack r ON s.rack_id = r.id
+        JOIN warehouse w ON r.warehouse_id = w.id
+        WHERE (b.max_volume - b.current_volume) > 0
+        ORDER BY 
+            CASE 
+                WHEN ? = 'hot_zone' AND ? = 'hot_zone' THEN 1
+                WHEN ? = 'warm_zone' AND ? IN ('hot_zone', 'warm_zone') THEN 2
+                ELSE 3
+            END,
+            (b.max_volume - b.current_volume) DESC
+        LIMIT 10
+    `;
+
+  db.all(sql, [preferredZone, preferredZone, preferredZone, preferredZone], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Ошибка рекомендаций' });
+    }
+    res.json(rows);
+  });
+}
 
 export default router;
