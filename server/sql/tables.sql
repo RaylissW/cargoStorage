@@ -1,6 +1,3 @@
--- =============================================
--- ПОЛНАЯ СХЕМА БАЗЫ ДАННЫХ (дипломная работа)
--- =============================================
 
 -- 1. Физическая структура склада
 CREATE TABLE IF NOT EXISTS warehouse (
@@ -49,6 +46,7 @@ CREATE TABLE IF NOT EXISTS cargo (
     height REAL NOT NULL CHECK (height > 0),
     depth REAL NOT NULL CHECK (depth > 0),
     volume REAL NOT NULL,
+    for_sale BOOLEAN DEFAULT FALSE,
     weight_per_unit REAL DEFAULT 0
 );
 

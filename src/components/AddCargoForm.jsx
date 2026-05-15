@@ -154,36 +154,67 @@ const AddCargoForm = ({ structure }) => {
 
           {showRecommendation && recommendedBins.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <h4>🔥 Рекомендуемые ячейки</h4>
-                {recommendedBins.map(bin => (
-                    <div key={bin.bin_id} style={{
-                      padding: '12px',
-                      marginBottom: '8px',
-                      border: selectedBinId === bin.bin_id ? '2px solid #006400' : '1px solid #ddd',
-                      borderRadius: '6px',
-                      background: selectedBinId === bin.bin_id ? '#e6ffe6' : 'white',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div>
-                        📍 {bin.warehouse} → Стеллаж {bin.rack} → Этаж {bin.shelf} → Ячейка {bin.cell}
+                <h4>🔥 Рекомендуемые ячейки ({recommendedBins.length})</h4>
+                {recommendedBins.map(bin => {
+                  const isSelected = selectedBinId === bin.bin_id;
+                  const fillColor = bin.fill_percent > 80 ? '#ffe6e6' :
+                      bin.fill_percent > 60 ? '#fff2cc' : '#e6ffe6';
+
+                  return (
+                      <div key={bin.bin_id} style={{
+                        padding: '14px',
+                        marginBottom: '10px',
+                        border: isSelected ? '3px solid #006400' : '1px solid #ddd',
+                        borderRadius: '8px',
+                        backgroundColor: isSelected ? '#e6ffe6' : fillColor,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: isSelected ? '0 0 8px rgba(0,100,0,0.3)' : 'none'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                            📍 {bin.warehouse} → Стеллаж {bin.rack} → Этаж {bin.shelf} → Ячейка {bin.cell}
+                          </div>
+                          <div style={{ fontSize: '0.9em', color: '#555' }}>
+                            Свободно: <strong>{Math.round(bin.free_volume)} см³</strong> •
+                            Заполнено: <strong>{bin.fill_percent}%</strong>
+                          </div>
+                          <div style={{
+                            display: 'inline-block',
+                            marginTop: '6px',
+                            padding: '2px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.85em',
+                            backgroundColor: bin.recommended_zone === 'hot_zone' ? '#ffe6e6' :
+                                bin.recommended_zone === 'warm_zone' ? '#fff2cc' : '#e6ffe6',
+                            color: bin.recommended_zone === 'hot_zone' ? '#c00' :
+                                bin.recommended_zone === 'warm_zone' ? '#c80' : '#080'
+                          }}>
+                            {bin.recommended_zone === 'hot_zone' ? '🔥 Горячая зона' :
+                                bin.recommended_zone === 'warm_zone' ? '🌡️ Тёплая зона' : '❄️ Холодная зона'}
+                          </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => handleSelectBin(bin.bin_id)}
+                            style={{
+                              background: isSelected ? '#006400' : '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              minWidth: '90px'
+                            }}
+                        >
+                          {isSelected ? '✅ Выбрано' : 'Выбрать'}
+                        </button>
                       </div>
-                      <button
-                          type="button"
-                          onClick={() => handleSelectBin(bin.bin_id)}
-                          style={{
-                            background: selectedBinId === bin.bin_id ? '#006400' : '#28a745',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 14px',
-                            borderRadius: '6px'
-                          }}
-                      >
-                        {selectedBinId === bin.bin_id ? '✅ Выбрано' : 'Выбрать'}
-                      </button>
-                    </div>
-                ))}
+                  );
+                })}
               </div>
           )}
 
