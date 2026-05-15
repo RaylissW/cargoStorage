@@ -247,14 +247,9 @@ router.post('/bin_cargo', (req, res) => {
 
 router.get('/recommend', (req, res) => {
   const { cargoName } = req.query;
-
-  if (!cargoName || !cargoName.trim()) {
-    return res.status(400).json({ error: 'Укажите название груза' });
-  }
+  if (!cargoName) return res.status(400).json({ error: 'Укажите cargoName' });
 
   const cargoNameLower = cargoName.trim().toLowerCase();
-
-  console.log(`🔍 [RECOMMEND] Запрос рекомендаций для груза: "${cargoNameLower}"`);
 
   const sql = `
     SELECT 
@@ -263,19 +258,15 @@ router.get('/recommend', (req, res) => {
       s.level AS shelf,
       b.cell_number AS cell,
       b.id AS bin_id,
-      b.width,
-      b.height,
-      b.depth,
       b.max_volume,
       COALESCE(SUM(bc.quantity * c.volume), 0) AS occupied_volume,
       (b.max_volume - COALESCE(SUM(bc.quantity * c.volume), 0)) AS free_volume,
       ROUND(100.0 * COALESCE(SUM(bc.quantity * c.volume), 0) / NULLIF(b.max_volume, 0), 1) AS fill_percent,
+      b.temperature,
+      b.humidity,
       COALESCE(f.recommended_zone, 'cold_zone') AS recommended_zone,
       CASE COALESCE(f.recommended_zone, 'cold_zone')
-        WHEN 'hot_zone'  THEN 3
-        WHEN 'warm_zone' THEN 2
-        WHEN 'cold_zone' THEN 1
-        ELSE 0
+        WHEN 'hot_zone' THEN 3 WHEN 'warm_zone' THEN 2 ELSE 1
       END AS zone_priority
     FROM bin b
     JOIN shelf s ON b.shelf_id = s.id
@@ -283,35 +274,17 @@ router.get('/recommend', (req, res) => {
     JOIN warehouse w ON r.warehouse_id = w.id
     LEFT JOIN bin_cargo bc ON bc.bin_id = b.id
     LEFT JOIN cargo c ON bc.cargo_id = c.id
-    LEFT JOIN forecast f 
-      ON f.sku = c.sku OR f.product_name = c.name   -- ← улучшенная связь
+    LEFT JOIN forecast f ON f.sku = c.sku OR LOWER(f.product_name) = LOWER(c.name)
     WHERE b.max_volume > 0
-      AND b.width >= 10 AND b.height >= 10 AND b.depth >= 10
-    GROUP BY b.id, w.name, r.name, s.level, b.cell_number, 
-             b.width, b.height, b.depth, b.max_volume, f.recommended_zone
+    GROUP BY b.id
     HAVING free_volume > 0
-    ORDER BY 
-      zone_priority DESC,
-      free_volume DESC,
-      fill_percent ASC
+    ORDER BY zone_priority DESC, free_volume DESC, fill_percent ASC
     LIMIT 10;
   `;
 
   db.all(sql, [cargoNameLower], (err, rows) => {
-    if (err) {
-      console.error('❌ Ошибка рекомендаций:', err.message);
-      return res.status(500).json({ error: 'Ошибка сервера' });
-    }
-
-    console.log(`✅ [RECOMMEND] Найдено ${rows.length} подходящих ячеек`);
-
-    const result = rows.map(row => ({
-      ...row,
-      zone_name: row.recommended_zone === 'hot_zone' ? '🔥 Горячая зона' :
-          row.recommended_zone === 'warm_zone' ? '🌡️ Тёплая зона' : '❄️ Холодная зона'
-    }));
-
-    res.json(result);
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
   });
 });
 export default router;

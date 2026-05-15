@@ -58,6 +58,10 @@ const AddCargoForm = ({ structure }) => {
     try {
       const bins = await getRecommendedBins(cargoData.name);
       setRecommendedBins(bins);
+      const uniqueBins = bins.filter((bin, index, self) =>
+          index === self.findIndex(b => b.warehouse === bin.warehouse && b.rack === bin.rack)
+      );
+      setRecommendedBins(uniqueBins);
       setShowRecommendation(true);
       setSelectedBinId(null);
     } catch (err) {
