@@ -6,6 +6,7 @@ const useWarehouseApi = () => {
 
   // Загрузка структуры и тестовый запрос
   useEffect(() => {
+    /*
     const fetchTest = async () => {
       try {
         const res = await fetch('http://localhost:3000/api/test');
@@ -15,7 +16,7 @@ const useWarehouseApi = () => {
         console.error('Ошибка тестового запроса:', err);
       }
     };
-
+*/
     const fetchStructure = async () => {
       try {
         const res = await fetch('http://localhost:3000/api/structure');
@@ -37,7 +38,7 @@ const useWarehouseApi = () => {
       }
     };
 
-    fetchTest();
+   // fetchTest();
     fetchStructure();
   }, []);
 
@@ -167,38 +168,29 @@ const deleteRack = async (rackId, warehouseId) => {
 };
 
 // Создание груза
-const createCargo = async (name) => {
-  console.log('Отправка данных для создания груза:', { name });
-  try {
-    const response = await fetch('http://localhost:3000/api/cargo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    console.log('Ответ сервера (POST /cargo):', response.status, response.statusText);
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch {
-        errorData = { error: 'Ошибка сервера' };
+  const createCargo = async (cargoData) => {
+    console.log('📤 Отправка данных для создания груза (полный объект):', cargoData);
+
+    try {
+      const response = await fetch('http://localhost:3000/api/cargo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cargoData)   // ← теперь передаём ВСЁ
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      console.error('Ошибка сервера:', errorData);
-      setError(errorData.error || 'Ошибка добавления груза');
+
+      const newCargo = await response.json();
+      console.log('✅ Новый груз создан:', newCargo);
+      return newCargo;
+    } catch (err) {
+      console.error('❌ Ошибка при добавлении груза:', err.message);
       return null;
     }
-    const newCargo = await response.json();
-    console.log('Новый груз:', newCargo);
-    setError(null);
-    return newCargo;
-  } catch (err) {
-    console.error('Ошибка при добавлении груза:', err.message);
-    setError('Не удалось добавить груз');
-    return null;
-  }
-};
-
-// Удаление груза
+  };
 
   // Удаление груза
   const deleteCargo = async (cargoId, binId) => {

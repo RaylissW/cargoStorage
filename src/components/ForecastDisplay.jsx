@@ -32,6 +32,23 @@ const ForecastDisplay = () => {
     return (
         <div className="forecast-display">
             <h2>📊 Прогноз спроса на 7 дней (XGBoost)</h2>
+            <button
+                onClick={async () => {
+                    setLoading(true);
+                    try {
+                        await fetch('http://localhost:3000/api/forecast/all'); // запускаем модель
+                        const data = await fetchForecasts(); // перезагружаем из БД
+                        setForecasts(data);
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        setLoading(false);
+                    }
+                }}
+                style={{ marginLeft: '15px', padding: '6px 12px' }}
+            >
+                🔄 Обновить прогнозы (запустить модель)
+            </button>
             <table border="1" cellPadding="10" style={{ borderCollapse: 'collapse', width: '100%', marginTop: '10px' }}>
                 <thead>
                 <tr style={{ background: '#f0f0f0' }}>

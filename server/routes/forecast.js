@@ -1,4 +1,3 @@
-// server/routes/forecast.js
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';

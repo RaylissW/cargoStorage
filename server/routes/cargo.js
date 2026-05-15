@@ -86,29 +86,79 @@ router.delete('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, width = 20.0, height = 20.0, depth = 20.0, volume, weight_per_unit = 0.5 } = req.body;
+  const {
+    name,
+    width = 20.0,
+    height = 20.0,
+    depth = 20.0,
+    volume,
+    weight_per_unit = 0.5,
+    storageParams   // ← сюда приходят параметры хранения
+  } = req.body;
+
+  console.log('📥 Получены данные для создания груза:', {
+    name,
+    width,
+    height,
+    depth,
+    storageParams: storageParams || '❌ НЕ ПЕРЕДАНЫ'
+  });
 
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Название груза обязательно' });
   }
 
-  const finalName = name.trim().toLowerCase();           // сохраняем в нижнем регистре
-  const finalVolume = volume || (width * height * depth); // если volume не передали — считаем
+  const finalName = name.trim().toLowerCase();
+  const finalVolume = volume || (width * height * depth);
 
-  const sql = `
+  const sqlCargo = `
     INSERT INTO cargo (name, width, height, depth, volume, weight_per_unit)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(sql, [finalName, width, height, depth, finalVolume, weight_per_unit], function(err) {
+  db.run(sqlCargo, [finalName, width, height, depth, finalVolume, weight_per_unit], function (err) {
     if (err) {
-      console.error('Ошибка создания груза:', err.message);
+      console.error('❌ Ошибка создания груза:', err.message);
       return res.status(500).json({ error: `Ошибка при создании груза: ${err.message}` });
     }
 
-    console.log(`✅ Создан груз: "${finalName}" (id=${this.lastID})`);
+    const cargoId = this.lastID;
+    console.log(`✅ Создан груз: "${finalName}" (id=${cargoId})`);
+
+    // === БЛОК СОХРАНЕНИЯ ПАРАМЕТРОВ ХРАНЕНИЯ ===
+    if (storageParams && Object.keys(storageParams).length > 0) {
+      console.log('🔧 Попытка сохранить параметры хранения:', storageParams);
+
+      const sqlParams = `
+        INSERT INTO product_characteristics (
+          cargo_id, 
+          temp_min, temp_max, 
+          humidity_min, humidity_max,
+          is_fragile, needs_refrigeration
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      db.run(sqlParams, [
+        cargoId,
+        storageParams.temp_min || null,
+        storageParams.temp_max || null,
+        storageParams.humidity_min || null,
+        storageParams.humidity_max || null,
+        storageParams.is_fragile ? 1 : 0,
+        storageParams.needs_refrigeration ? 1 : 0
+      ], function (err) {
+        if (err) {
+          console.error('❌ Ошибка сохранения параметров хранения:', err.message);
+        } else {
+          console.log(`🎉 Параметры хранения УСПЕШНО сохранены для груза id=${cargoId}`);
+        }
+      });
+    } else {
+      console.log('⚠️ storageParams отсутствует или пустой — параметры хранения НЕ сохранялись');
+    }
+
     res.json({
-      id: this.lastID,
+      id: cargoId,
       name: finalName,
       width,
       height,
@@ -119,5 +169,41 @@ router.post('/', (req, res) => {
   });
 });
 
+// Получить параметры хранения по названию груза (для копирования шаблона)
+router.get('/characteristics/:name', (req, res) => {
+  const name = req.params.name.trim().toLowerCase();
 
+  const sql = `
+    SELECT 
+      pc.temp_min, pc.temp_max, 
+      pc.humidity_min, pc.humidity_max,
+      pc.is_fragile, pc.needs_refrigeration
+    FROM product_characteristics pc
+    JOIN cargo c ON pc.cargo_id = c.id
+    WHERE LOWER(c.name) = ?
+    LIMIT 1
+  `;
+
+  db.get(sql, [name], (err, row) => {
+    if (err) {
+      console.error('Ошибка получения характеристик:', err.message);
+      return res.status(500).json({ error: 'Ошибка сервера' });
+    }
+
+    if (!row) {
+      return res.json({}); // нет характеристик — возвращаем пустой объект
+    }
+
+    console.log(`📋 Найдены характеристики для "${name}":`, row);
+
+    res.json({
+      temp_min: row.temp_min,
+      temp_max: row.temp_max,
+      humidity_min: row.humidity_min,
+      humidity_max: row.humidity_max,
+      is_fragile: !!row.is_fragile,
+      needs_refrigeration: !!row.needs_refrigeration
+    });
+  });
+});
 export default router;

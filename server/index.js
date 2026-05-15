@@ -9,43 +9,45 @@ app.use(cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type']
 }));
 
 app.use(express.json());
 app.use('/api', apiRoutes);
 
-app.get('/', (req, res) => {
-  console.log('Получен запрос на /');
-  res.send('Warehouse API');
-});
+// Простой тестовый маршрут
+app.get('/', (req, res) => res.send('Warehouse API работает'));
 
-app.get('/api/test', (req, res) => {
-  console.log('Получен тестовый запрос GET /api/test');
-  res.json({ message: 'Тестовый эндпоинт работает!' });
-});
+// Автоматический запуск прогноза при старте сервера
+const runForecastOnStartup = async () => {
+  console.log('🚀 Запуск прогнозирования спроса при старте сервера...');
+  try {
+    const response = await fetch('http://localhost:3000/api/forecast/all');
+    if (response.ok) {
+      console.log('✅ Прогноз успешно выполнен и сохранён в БД при старте сервера');
+    } else {
+      console.error('⚠️ Прогноз вернул ошибку при старте');
+    }
+  } catch (err) {
+    console.error('❌ Не удалось выполнить прогноз при старте сервера:', err.message);
+  }
+};
 
-// Обработка ошибок
-app.use((err, req, res, next) => {
-  console.error('Ошибка сервера:', err.stack);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-});
-
-const server = app.listen(3000, () => {
+// Запускаем сервер
+const server = app.listen(3000, async () => {
   console.log('Server running on port 3000');
+  console.log('✅ Подключено к базе данных SQLite');
+
+  // Запускаем прогноз после старта сервера (не блокируем запуск)
+  setTimeout(runForecastOnStartup, 2000); // небольшая задержка, чтобы сервер полностью поднялся
 });
 
 process.on('SIGINT', () => {
   console.log('Завершение работы сервера');
   server.close(() => {
-    db.close((err) => {
-      if (err) console.error('Ошибка закрытия базы данных:', err.message);
+    db.close(() => {
       console.log('База данных закрыта');
       process.exit(0);
     });
   });
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Непойманная ошибка:', err);
 });

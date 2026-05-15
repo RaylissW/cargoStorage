@@ -245,37 +245,67 @@ router.post('/bin_cargo', (req, res) => {
   );
 });
 
-router.get('/recommend', async (req, res) => {
+router.get('/recommend', (req, res) => {
   const { cargoName } = req.query;
 
-  if (!cargoName) {
+  if (!cargoName || cargoName.trim() === '') {
     return res.status(400).json({ error: 'Укажите cargoName' });
   }
 
-  console.log(`🔍 Рекомендация ячеек для груза: "${cargoName}"`);
+  const cleanName = cargoName.trim().toLowerCase();
+  console.log(`🔍 Рекомендация ячеек для груза: "${cleanName}"`);
 
-  // 1. Получаем прогноз для этого товара
   const forecastSql = `
-        SELECT recommended_zone 
-        FROM forecast 
-        WHERE LOWER(product_name) = LOWER(?)
-        ORDER BY last_calculated DESC 
-        LIMIT 1
+    SELECT recommended_zone 
+    FROM forecast 
+    WHERE LOWER(product_name) = ?
+    ORDER BY last_calculated DESC 
+    LIMIT 1
+  `;
+
+  db.get(forecastSql, [cleanName], (err, forecastRow) => {
+    const preferredZone = forecastRow ? forecastRow.recommended_zone : null;
+
+    const sql = `
+      SELECT 
+        w.name AS warehouse,
+        r.name AS rack,
+        s.level AS shelf,
+        b.cell_number AS cell,
+        b.id AS bin_id,
+        (b.max_volume - b.current_volume) AS free_volume,
+        ? AS recommended_zone
+      FROM bin b
+      JOIN shelf s ON b.shelf_id = s.id
+      JOIN rack r ON s.rack_id = r.id
+      JOIN warehouse w ON r.warehouse_id = w.id
+      WHERE (b.max_volume - b.current_volume) > 500
+      ORDER BY 
+        CASE 
+          WHEN ? = 'hot_zone' AND ? = 'hot_zone' THEN 1
+          WHEN ? = 'warm_zone' AND ? IN ('hot_zone', 'warm_zone') THEN 2
+          ELSE 3
+        END,
+        (b.max_volume - b.current_volume) DESC
+      LIMIT 8
     `;
 
-  db.get(forecastSql, [cargoName], (err, forecast) => {
-    if (err || !forecast) {
-      // Если прогноза нет — возвращаем обычные свободные ячейки
-      return getFreeBins(res, null);
-    }
-
-    getFreeBins(res, forecast.recommended_zone);
+    db.all(sql, [preferredZone, preferredZone, preferredZone, preferredZone, preferredZone], (err, rows) => {
+      if (err) {
+        console.error('Ошибка рекомендаций:', err.message);
+        return res.status(500).json({ error: 'Ошибка рекомендаций' });
+      }
+      console.log(`✅ Найдено ${rows.length} ячеек`);
+      res.json(rows);
+    });
   });
 });
+export default router;
 
+/*
 function getFreeBins(res, preferredZone = null) {
   const sql = `
-        SELECT 
+        SELECT
             w.name AS warehouse,
             r.name AS rack,
             s.level AS shelf,
@@ -288,8 +318,8 @@ function getFreeBins(res, preferredZone = null) {
         JOIN rack r ON s.rack_id = r.id
         JOIN warehouse w ON r.warehouse_id = w.id
         WHERE (b.max_volume - b.current_volume) > 0
-        ORDER BY 
-            CASE 
+        ORDER BY
+            CASE
                 WHEN ? = 'hot_zone' AND ? = 'hot_zone' THEN 1
                 WHEN ? = 'warm_zone' AND ? IN ('hot_zone', 'warm_zone') THEN 2
                 ELSE 3
@@ -306,5 +336,4 @@ function getFreeBins(res, preferredZone = null) {
     res.json(rows);
   });
 }
-
-export default router;
+ */

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS bin (
 
 CREATE TABLE IF NOT EXISTS cargo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,                    -- УБРАЛИ UNIQUE — можно добавлять много раз
     width REAL NOT NULL CHECK (width > 0),
     height REAL NOT NULL CHECK (height > 0),
     depth REAL NOT NULL CHECK (depth > 0),
@@ -96,14 +96,16 @@ CREATE TABLE IF NOT EXISTS sensor_reading (
 
 -- 3. Модуль принятия решений
 CREATE TABLE IF NOT EXISTS product_characteristics (
-    cargo_id INTEGER PRIMARY KEY,
-    temp_min REAL,
-    temp_max REAL,
-    humidity_min REAL,
-    humidity_max REAL,
-    compatibility_group TEXT,
-    is_hazardous BOOLEAN DEFAULT FALSE,
-    is_fragile BOOLEAN DEFAULT FALSE,
+    cargo_id              INTEGER PRIMARY KEY,
+    temp_min              REAL,
+    temp_max              REAL,
+    humidity_min          REAL,
+    humidity_max          REAL,
+    compatibility_group   TEXT,
+    is_hazardous          BOOLEAN DEFAULT FALSE,
+    is_fragile            BOOLEAN DEFAULT FALSE,
+    needs_refrigeration   BOOLEAN DEFAULT FALSE,     -- требуется холодильник
+    last_updated          TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cargo_id) REFERENCES cargo(id) ON DELETE CASCADE
 );
 
@@ -130,6 +132,8 @@ CREATE TABLE IF NOT EXISTS forecast (
     last_calculated         TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cargo_id) REFERENCES cargo(id) ON DELETE SET NULL
 );
+
+
 
 -- Индексы
 CREATE INDEX IF NOT EXISTS idx_cargo_name ON cargo(name);
