@@ -86,85 +86,60 @@ router.delete('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const {
-    name,
-    width = 20.0,
-    height = 20.0,
-    depth = 20.0,
-    volume,
-    weight_per_unit = 0.5,
-    storageParams   // ← сюда приходят параметры хранения
-  } = req.body;
+  const { name, width, height, depth, volume, storageParams } = req.body;
 
-  console.log('📥 Получены данные для создания груза:', {
-    name,
-    width,
-    height,
-    depth,
-    storageParams: storageParams || '❌ НЕ ПЕРЕДАНЫ'
-  });
-
-  if (!name || name.trim() === '') {
+  if (!name) {
     return res.status(400).json({ error: 'Название груза обязательно' });
   }
 
-  const finalName = name.trim().toLowerCase();
-  const finalVolume = volume || (width * height * depth);
+  console.log('📥 Получены данные для создания груза:', req.body);
 
-  const sqlCargo = `
-    INSERT INTO cargo (name, width, height, depth, volume, weight_per_unit)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
-
-  db.run(sqlCargo, [finalName, width, height, depth, finalVolume, weight_per_unit], function (err) {
+  // Сначала проверяем, есть ли уже груз с таким названием
+  db.get(`SELECT id FROM cargo WHERE name = ?`, [name], (err, existing) => {
     if (err) {
-      console.error('❌ Ошибка создания груза:', err.message);
-      return res.status(500).json({ error: `Ошибка при создании груза: ${err.message}` });
+      console.error('Ошибка поиска существующего груза:', err.message);
+      return res.status(500).json({ error: err.message });
     }
 
-    const cargoId = this.lastID;
-    console.log(`✅ Создан груз: "${finalName}" (id=${cargoId})`);
-
-    // === БЛОК СОХРАНЕНИЯ ПАРАМЕТРОВ ХРАНЕНИЯ ===
-    if (storageParams && Object.keys(storageParams).length > 0) {
-      console.log('🔧 Попытка сохранить параметры хранения:', storageParams);
-
-      const sqlParams = `
-        INSERT INTO product_characteristics (
-          cargo_id, 
-          temp_min, temp_max, 
-          humidity_min, humidity_max,
-          is_fragile, needs_refrigeration
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      db.run(sqlParams, [
-        cargoId,
-        storageParams.temp_min || null,
-        storageParams.temp_max || null,
-        storageParams.humidity_min || null,
-        storageParams.humidity_max || null,
-        storageParams.is_fragile ? 1 : 0,
-        storageParams.needs_refrigeration ? 1 : 0
-      ], function (err) {
-        if (err) {
-          console.error('❌ Ошибка сохранения параметров хранения:', err.message);
-        } else {
-          console.log(`🎉 Параметры хранения УСПЕШНО сохранены для груза id=${cargoId}`);
-        }
-      });
-    } else {
-      console.log('⚠️ storageParams отсутствует или пустой — параметры хранения НЕ сохранялись');
+    if (existing) {
+      // Груз уже существует — возвращаем его id
+      console.log(`✅ Найден существующий груз "${name}" (id=${existing.id})`);
+      return res.json({ id: existing.id, name, ...req.body });
     }
 
-    res.json({
-      id: cargoId,
-      name: finalName,
-      width,
-      height,
-      depth,
-      volume: finalVolume,
-      weight_per_unit
+    // Груз новый — создаём
+    db.run(`
+      INSERT INTO cargo (name, width, height, depth, volume, weight_per_unit, for_sale)
+      VALUES (?, ?, ?, ?, ?, 1.0, 0)
+    `, [name, width || 20, height || 20, depth || 20, volume || 8000], function (err) {
+      if (err) {
+        console.error('Ошибка создания груза:', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+
+      const newCargoId = this.lastID;
+      console.log(`✅ Создан новый груз "${name}" (id=${newCargoId})`);
+
+      // Сохраняем параметры хранения
+      if (storageParams) {
+        db.run(`
+          INSERT OR IGNORE INTO product_characteristics 
+          (cargo_id, temp_min, temp_max, humidity_min, humidity_max, is_fragile, needs_refrigeration)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [
+          newCargoId,
+          storageParams.temp_min || 15,
+          storageParams.temp_max || 30,
+          storageParams.humidity_min || 30,
+          storageParams.humidity_max || 70,
+          storageParams.is_fragile ? 1 : 0,
+          storageParams.needs_refrigeration ? 1 : 0
+        ], () => {
+          console.log(`🎉 Параметры хранения сохранены для груза id=${newCargoId}`);
+        });
+      }
+
+      res.json({ id: newCargoId, name, ...req.body });
     });
   });
 });

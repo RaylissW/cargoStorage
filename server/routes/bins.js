@@ -249,7 +249,7 @@ router.get('/recommend', (req, res) => {
   const { cargoName } = req.query;
   if (!cargoName) return res.status(400).json({ error: 'Укажите cargoName' });
 
-  const cargoNameLower = cargoName.trim().toLowerCase();
+  console.log('🔍 [RECOMMEND] Запрос рекомендаций для груза:', cargoName);
 
   const sql = `
     SELECT 
@@ -262,29 +262,172 @@ router.get('/recommend', (req, res) => {
       COALESCE(SUM(bc.quantity * c.volume), 0) AS occupied_volume,
       (b.max_volume - COALESCE(SUM(bc.quantity * c.volume), 0)) AS free_volume,
       ROUND(100.0 * COALESCE(SUM(bc.quantity * c.volume), 0) / NULLIF(b.max_volume, 0), 1) AS fill_percent,
-      b.temperature,
+      COALESCE(b.temperature, 20) AS temperature,
       b.humidity,
+      COALESCE(z.name, 'Не назначена') AS zone_name,
       COALESCE(f.recommended_zone, 'cold_zone') AS recommended_zone,
-      CASE COALESCE(f.recommended_zone, 'cold_zone')
-        WHEN 'hot_zone' THEN 3 WHEN 'warm_zone' THEN 2 ELSE 1
-      END AS zone_priority
+      pc.temp_min,
+      pc.temp_max,
+      -- Приоритет: если в ячейке уже есть такой же товар
+      MAX(CASE WHEN LOWER(c.name) = LOWER(?) THEN 1 ELSE 0 END) AS has_same_cargo
     FROM bin b
     JOIN shelf s ON b.shelf_id = s.id
     JOIN rack r ON s.rack_id = r.id
     JOIN warehouse w ON r.warehouse_id = w.id
+    LEFT JOIN zone z ON b.zone_id = z.id
     LEFT JOIN bin_cargo bc ON bc.bin_id = b.id
     LEFT JOIN cargo c ON bc.cargo_id = c.id
-    LEFT JOIN forecast f ON f.sku = c.sku OR LOWER(f.product_name) = LOWER(c.name)
+    LEFT JOIN forecast f ON LOWER(f.product_name) = LOWER(c.name)
+    LEFT JOIN product_characteristics pc ON pc.cargo_id = c.id
     WHERE b.max_volume > 0
     GROUP BY b.id
     HAVING free_volume > 0
-    ORDER BY zone_priority DESC, free_volume DESC, fill_percent ASC
-    LIMIT 10;
+    ORDER BY 
+      has_same_cargo DESC,                                      -- сначала те, где уже есть такой товар
+      CASE WHEN b.temperature BETWEEN pc.temp_min AND pc.temp_max THEN 3 ELSE 0 END DESC,
+      free_volume DESC,
+      fill_percent ASC
+    LIMIT 20;
   `;
 
-  db.all(sql, [cargoNameLower], (err, rows) => {
+  db.all(sql, [cargoName], (err, rows) => {
+    if (err) {
+      console.error('❌ Ошибка SQL в /recommend:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`✅ [RECOMMEND] Найдено ${rows.length} ячеек`);
+    console.log('Первые 5 для отладки:', rows.slice(0, 5));
+    res.json(rows);
+  });
+});
+router.get('/sensor/latest', (req, res) => {
+  console.log('Запрос /sensor/latest');
+  db.all(`
+    SELECT 
+      sr.id,
+      sr.sensor_id,
+      sr.temperature,
+      sr.humidity,
+      sr.pressure,
+      sr.timestamp,
+      COALESCE(b.cell_number, '—') AS bin_location,   -- ← исправлено
+      COALESCE(s.level, '—') AS shelf,
+      COALESCE(r.name, '—') AS rack,
+      COALESCE(w.name, '—') AS warehouse,
+      COALESCE(z.name, 'Не назначена') AS zone_name   -- ← добавили зону
+    FROM sensor_reading sr
+    LEFT JOIN sensor se ON sr.sensor_id = se.id
+    LEFT JOIN bin b ON se.bin_id = b.id
+    LEFT JOIN shelf s ON b.shelf_id = s.id
+    LEFT JOIN rack r ON s.rack_id = r.id
+    LEFT JOIN warehouse w ON r.warehouse_id = w.id
+    LEFT JOIN zone z ON b.zone_id = z.id
+    ORDER BY sr.timestamp DESC
+    LIMIT 50
+  `, [], (err, rows) => {
+    if (err) {
+      console.error('Ошибка /sensor/latest:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`✅ /sensor/latest вернул ${rows.length} записей`);
+    res.json(rows);
+  });
+});
+router.get('/cargo/characteristics', (req, res) => {
+  db.all(`
+    SELECT 
+      c.name AS cargo_name,
+      pc.temp_min,
+      pc.temp_max,
+      pc.humidity_min,
+      pc.humidity_max,
+      pc.is_fragile,
+      pc.needs_refrigeration
+    FROM product_characteristics pc
+    JOIN cargo c ON pc.cargo_id = c.id
+    ORDER BY c.name
+  `, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
+
+router.patch('/bin_cargo/increment', (req, res) => {
+  const { bin_id, cargo_id, quantity } = req.body;
+
+  if (!bin_id || !cargo_id || !quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'bin_id, cargo_id и quantity > 0 обязательны' });
+  }
+
+  console.log(`📥 UPSERT bin_cargo: bin=${bin_id}, cargo=${cargo_id}, +${quantity}`);
+
+  db.run(`
+    INSERT INTO bin_cargo (bin_id, cargo_id, quantity)
+    VALUES (?, ?, ?)
+    ON CONFLICT(bin_id, cargo_id) 
+    DO UPDATE SET quantity = quantity + ?
+  `, [bin_id, cargo_id, quantity, quantity], function (err) {
+    if (err) {
+      console.error('❌ Ошибка UPSERT:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    console.log(`✅ Груз успешно добавлен/увеличен (changes=${this.changes})`);
+    res.json({
+      message: 'Груз успешно добавлен/увеличен',
+      bin_id,
+      cargo_id,
+      quantity: quantity
+    });
+  });
+});
+
+
+router.get('/AddMeasure', (req, res) => {
+  const {
+    sens: sensor_id,
+    temp,
+    hum,
+    press,
+    tS: temp_smooth,
+    hS: hum_smooth,
+    pS: press_smooth,
+    time: timestamp
+  } = req.query;
+
+  console.log('\n' + '='.repeat(60));
+  console.log('📡 ПОКАЗАНИЕ ОТ ДАТЧИКА ПОЛУЧЕНО');
+  console.log('=' .repeat(60));
+  console.log(`📌 Sensor ID     : ${sensor_id}`);
+  console.log(`🌡️  Температура   : ${temp} °C (сглаженное: ${temp_smooth} °C)`);
+  console.log(`💧 Влажность     : ${hum} % (сглаженное: ${hum_smooth} %)`);
+  console.log(`📈 Давление      : ${press} мм рт. ст. (сглаженное: ${press_smooth} мм рт. ст.)`);
+  console.log(`⏰ Время         : ${timestamp || new Date().toISOString()}`);
+  console.log('='.repeat(60));
+
+  if (!sensor_id) {
+    console.log('❌ Ошибка: sensor_id не передан');
+    return res.status(400).json({ error: 'sensor_id обязателен' });
+  }
+
+  // Сохраняем в историю
+  db.run(`
+    INSERT INTO sensor_reading (sensor_id, timestamp, temperature, humidity, pressure)
+    VALUES (?, ?, ?, ?, ?)
+  `, [sensor_id, timestamp || new Date().toISOString(), parseFloat(temp), parseFloat(hum), parseFloat(press)]);
+
+  // Обновляем последние показания в bin
+  db.run(`
+    UPDATE bin
+    SET temperature = ?,
+        humidity = ?,
+        pressure = ?,
+        last_measurement = CURRENT_TIMESTAMP
+    WHERE id = (SELECT bin_id FROM sensor WHERE id = ?)
+  `, [parseFloat(temp), parseFloat(hum), parseFloat(press), sensor_id]);
+
+  console.log(`✅ Данные успешно сохранены для sensor_id = ${sensor_id}`);
+  res.json({ status: 'ok', message: 'Данные датчика приняты' });
+});
+
 export default router;

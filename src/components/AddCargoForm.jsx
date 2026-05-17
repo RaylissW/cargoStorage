@@ -3,7 +3,7 @@ import useWarehouseApi from '../hooks/useWarehouseApi';
 import StorageParamsForm from './StorageParamsForm';
 
 const AddCargoForm = ({ structure }) => {
-  const { getRecommendedBins, createCargo, assignCargoToBin } = useWarehouseApi();
+  const { getRecommendedBins, createCargo, assignCargoToBin, incrementCargoQuantity } = useWarehouseApi();
 
   const [cargoData, setCargoData] = useState({
     name: '',
@@ -76,38 +76,34 @@ const AddCargoForm = ({ structure }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedBinId) {
-      alert('Выберите ячейку из рекомендаций');
-      return;
-    }
+    if (!selectedBinId) return;
 
     const fullCargoData = {
-      name: cargoData.name,
+      name: cargoData.name.trim(),
       width: parseFloat(cargoData.width) || 20,
       height: parseFloat(cargoData.height) || 20,
       depth: parseFloat(cargoData.depth) || 20,
-      storageParams: storageParams   // ← теперь правильно берём отдельное состояние
+      storageParams: storageParams
     };
 
-    const cargo = await createCargo(fullCargoData);
+    try {
+      const cargo = await createCargo(fullCargoData);
 
-    if (cargo) {
-      await assignCargoToBin(
-          parseInt(selectedBinId),
-          cargo.id,
-          parseInt(cargoData.quantity) || 1
-      );
-
-      // Сброс формы
-      setCargoData({ name: '', quantity: '1', width: '20', height: '20', depth: '20' });
-      setStorageParams({
-        temp_min: '', temp_max: '', humidity_min: '', humidity_max: '',
-        is_fragile: false, needs_refrigeration: false
-      });
-      setRecommendedBins([]);
-      setShowRecommendation(false);
-      setSelectedBinId(null);
+      if (cargo) {
+        await incrementCargoQuantity(selectedBinId, cargo.id, parseInt(cargoData.quantity) || 1);
+        console.log(`✅ Груз "${cargo.name}" добавлен/увеличен в ячейке ${selectedBinId}`);
+      }
+    } catch (err) {
+      console.error('Ошибка при добавлении груза:', err);
+      alert('Ошибка при добавлении груза');
     }
+
+    // Сброс формы
+    setCargoData({ name: '', quantity: '1', width: '20', height: '20', depth: '20' });
+    setStorageParams({ temp_min: '', temp_max: '', humidity_min: '', humidity_max: '', is_fragile: false, needs_refrigeration: false });
+    setRecommendedBins([]);
+    setShowRecommendation(false);
+    setSelectedBinId(null);
   };
 
   return (
@@ -161,8 +157,7 @@ const AddCargoForm = ({ structure }) => {
                 <h4>🔥 Рекомендуемые ячейки ({recommendedBins.length})</h4>
                 {recommendedBins.map(bin => {
                   const isSelected = selectedBinId === bin.bin_id;
-                  const fillColor = bin.fill_percent > 80 ? '#ffe6e6' :
-                      bin.fill_percent > 60 ? '#fff2cc' : '#e6ffe6';
+                  const fillColor = bin.fill_percent > 80 ? '#ffe6e6' : bin.fill_percent > 60 ? '#fff2cc' : '#e6ffe6';
 
                   return (
                       <div key={bin.bin_id} style={{
@@ -181,22 +176,26 @@ const AddCargoForm = ({ structure }) => {
                             📍 {bin.warehouse} → Стеллаж {bin.rack} → Этаж {bin.shelf} → Ячейка {bin.cell}
                           </div>
                           <div style={{ fontSize: '0.9em', color: '#555' }}>
-                            Свободно: <strong>{Math.round(bin.free_volume)} см³</strong> •
-                            Заполнено: <strong>{bin.fill_percent}%</strong>
+                            Свободно: <strong>{Math.round(bin.free_volume)} см³</strong> • Заполнено: <strong>{bin.fill_percent}%</strong>
                           </div>
+                          {bin.zone_name && (
+                              <div style={{ marginTop: '6px', fontSize: '0.85em' }}>
+                                <strong>Зона:</strong> {bin.zone_name}
+                                {bin.temperature !== null && bin.temperature !== undefined && (
+                                    <span style={{ marginLeft: '8px' }}>🌡️ {Number(bin.temperature).toFixed(1)}°C</span>
+                                )}
+                              </div>
+                          )}
                           <div style={{
                             display: 'inline-block',
                             marginTop: '6px',
                             padding: '2px 10px',
                             borderRadius: '12px',
                             fontSize: '0.85em',
-                            backgroundColor: bin.recommended_zone === 'hot_zone' ? '#ffe6e6' :
-                                bin.recommended_zone === 'warm_zone' ? '#fff2cc' : '#e6ffe6',
-                            color: bin.recommended_zone === 'hot_zone' ? '#c00' :
-                                bin.recommended_zone === 'warm_zone' ? '#c80' : '#080'
+                            backgroundColor: bin.recommended_zone === 'hot_zone' ? '#ffe6e6' : bin.recommended_zone === 'warm_zone' ? '#fff2cc' : '#e6ffe6',
+                            color: bin.recommended_zone === 'hot_zone' ? '#c00' : bin.recommended_zone === 'warm_zone' ? '#c80' : '#080'
                           }}>
-                            {bin.recommended_zone === 'hot_zone' ? '🔥 Горячая зона' :
-                                bin.recommended_zone === 'warm_zone' ? '🌡️ Тёплая зона' : '❄️ Холодная зона'}
+                            {bin.recommended_zone === 'hot_zone' ? '🔥 Горячая зона' : bin.recommended_zone === 'warm_zone' ? '🌡️ Тёплая зона' : '❄️ Холодная зона'}
                           </div>
                         </div>
 

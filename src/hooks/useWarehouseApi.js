@@ -299,10 +299,23 @@ const assignCargoToBin = async (bin_id, cargo_id, quantity) => {
   }
 };
 
-const updateBin = async (binId) => {
+  const incrementCargoQuantity = async (binId, cargoId, quantityToAdd) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/bin_cargo/increment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bin_id: binId, cargo_id: cargoId, quantity: quantityToAdd })
+      });
 
-}
-
+      if (!res.ok) throw new Error('Не удалось увеличить количество');
+      const data = await res.json();
+      console.log('✅ Количество груза увеличено:', data);
+      return data;
+    } catch (err) {
+      console.error('Ошибка incrementCargoQuantity:', err);
+      throw err;
+    }
+  };
 
 // Поиск грузов
   const searchCargo = async (query) => {
@@ -406,6 +419,7 @@ const getBinQRUrl = async (binId, type = 'link') => {
     deleteCargo,
     assignCargoToBin,
     searchCargo,
+    incrementCargoQuantity,
     getBinQRUrl,
     fetchForecasts,
     getRecommendedBins

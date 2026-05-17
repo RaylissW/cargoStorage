@@ -91,21 +91,21 @@ const seedDb = () => {
 
 
         const allCargo = [
-            { name: 'держатель для наушников на стол', volume: 536, for_sale: true },
-            { name: 'брелок скелет майнкрафт', volume: 417, for_sale: true },
-            { name: 'держатель для телефона котёнок', volume: 863, for_sale: true },
-            { name: 'картонные коробки', volume: 96000, for_sale: false },
-            { name: '3D принтер', volume: 150000, for_sale: false },
-            { name: 'пластик для 3D-принтера', volume: 36000, for_sale: false },
-            { name: 'радиодетали', volume: 3000, for_sale: false },
-            { name: 'баллон с газом', volume: 1200, for_sale: false },
-            { name: 'магнитные метки', volume: 800, for_sale: false },
-            { name: 'бумажные метки', volume: 400, for_sale: false },
-            { name: 'высокоточный измерительный прибор', volume: 900, for_sale: false },
-            { name: 'ткань декоративная', volume: 1200, for_sale: false },
-            { name: 'хрупкие стеклянные элементы', volume: 600, for_sale: false },
-            { name: 'термочувствительный пластик', volume: 1500, for_sale: false },
-            { name: 'медицинские расходники', volume: 700, for_sale: false }
+            { name: 'держатель для наушников на стол', volume: 200, for_sale: true },
+            { name: 'брелок скелет майнкрафт', volume: 180, for_sale: true },
+            { name: 'держатель для телефона котёнок', volume: 150, for_sale: true },
+            { name: 'картонные коробки', volume: 360, for_sale: false },
+            { name: '3D принтер', volume: 1500, for_sale: false },
+            { name: 'пластик для 3D-принтера', volume: 4600, for_sale: false },
+            { name: 'радиодетали', volume: 300, for_sale: false },
+            { name: 'баллон с газом', volume: 120, for_sale: false },
+            { name: 'магнитные метки', volume: 80, for_sale: false },
+            { name: 'бумажные метки', volume: 40, for_sale: false },
+            { name: 'высокоточный измерительный прибор', volume: 90, for_sale: false },
+            { name: 'ткань декоративная', volume: 120, for_sale: false },
+            { name: 'хрупкие стеклянные элементы', volume: 60, for_sale: false },
+            { name: 'термочувствительный пластик', volume: 150, for_sale: false },
+            { name: 'медицинские расходники', volume: 70, for_sale: false }
         ];
         setTimeout(() => {
         allCargo.forEach(item => {
@@ -192,7 +192,7 @@ const seedDb = () => {
             // Стеллаж 1, полка 3 и 4, этаж 1 — картонные коробки
             db.run(`
             INSERT OR IGNORE INTO bin_cargo (bin_id, cargo_id, quantity)
-            SELECT b.id, c.id, 200
+            SELECT b.id, c.id, 80
             FROM bin b
             JOIN shelf s ON b.shelf_id = s.id
             JOIN rack r ON s.rack_id = r.id
@@ -214,7 +214,7 @@ const seedDb = () => {
 
             db.run(`
             INSERT OR IGNORE INTO bin_cargo (bin_id, cargo_id, quantity)
-            SELECT b.id, c.id, 50
+            SELECT b.id, c.id, 20
             FROM bin b
             JOIN shelf s ON b.shelf_id = s.id
             JOIN rack r ON s.rack_id = r.id
@@ -225,7 +225,7 @@ const seedDb = () => {
             // Стеллаж 4 (Склад 2) — радиодетали
             db.run(`
             INSERT OR IGNORE INTO bin_cargo (bin_id, cargo_id, quantity)
-            SELECT b.id, c.id, 300
+            SELECT b.id, c.id, 30
             FROM bin b
             JOIN shelf s ON b.shelf_id = s.id
             JOIN rack r ON s.rack_id = r.id
@@ -236,8 +236,77 @@ const seedDb = () => {
         }, 3000);
 
         setTimeout(() => {
+            console.log('🏷️ Создаём зоны хранения...');
+            db.run(`
+    INSERT OR IGNORE INTO zone 
+        (name, warehouse_id, description, default_temp_min, default_temp_max, default_humidity_min, default_humidity_max)
+    VALUES 
+        ('Обычная зона',           1, 'Обычные товары',          2,  20, 35, 50),
+        ('Морозильная зона',       1, 'Товары требующие холода',  -5, 8,  30, 70),
+        ('Обычная зона 2',         2, 'Обычные товары',         19, 27, 60, 90),
+        ('Чувствительная зона',    2, 'Радиодетали и электроника',17, 24, 25, 50)
+`);
 
-        }, 3000);
+            // Привязываем зоны к первым ячейкам каждого стеллажа (пример)
+            console.log('🔄 Назначаем зоны ячейкам...');
+
+            // Зона 1: Склад 1 (печатная) — стеллажи 1 и 2
+            db.run(`
+  UPDATE bin 
+  SET zone_id = 1 
+  WHERE shelf_id IN (
+    SELECT s.id 
+    FROM shelf s 
+    JOIN rack r ON s.rack_id = r.id 
+    WHERE r.warehouse_id = 1 AND r.id IN (1, 2)
+  )
+`, [], () => console.log('✅ Зона 1 назначена (Склад 1, стеллажи 1+2)'));
+
+// Зона 2: Склад 1 (печатная) — стеллаж 3
+            db.run(`
+  UPDATE bin 
+  SET zone_id = 2 
+  WHERE shelf_id IN (
+    SELECT s.id 
+    FROM shelf s 
+    JOIN rack r ON s.rack_id = r.id 
+    WHERE r.warehouse_id = 1 AND r.id = 3
+  )
+`, [], () => console.log('✅ Зона 2 назначена (Склад 1, стеллаж 3)'));
+
+// Зона 3: Склад 2 (мастерская) — стеллажи 1 и 2
+            db.run(`
+  UPDATE bin 
+  SET zone_id = 3 
+  WHERE shelf_id IN (
+    SELECT s.id 
+    FROM shelf s 
+    JOIN rack r ON s.rack_id = r.id 
+    WHERE r.warehouse_id = 2 AND r.id IN (1, 2)
+  )
+`, [], () => console.log('✅ Зона 3 назначена (Склад 2, стеллажи 1+2)'));
+
+// Зона 4: Склад 2 (мастерская) — стеллажи 3 и 4
+            db.run(`
+  UPDATE bin 
+  SET zone_id = 4 
+  WHERE shelf_id IN (
+    SELECT s.id 
+    FROM shelf s 
+    JOIN rack r ON s.rack_id = r.id 
+    WHERE r.warehouse_id = 2 AND r.id IN (3, 4)
+  )
+`, [], () => console.log('✅ Зона 4 назначена (Склад 2, стеллажи 3+4)'));
+            console.log('✅ Зоны успешно назначены по стеллажам');
+
+            // Создаём датчики и привязываем их к ячейкам (по одному на зону)
+            db.run(`INSERT OR IGNORE INTO sensor (id, bin_id, sensor_type, mqtt_topic) VALUES (40, 1, 'DHT22+BME280', 'warehouse/sensor/40')`);
+            db.run(`INSERT OR IGNORE INTO sensor (id, bin_id, sensor_type, mqtt_topic) VALUES (41, 20, 'DHT22+BME280', 'warehouse/sensor/41')`);
+            db.run(`INSERT OR IGNORE INTO sensor (id, bin_id, sensor_type, mqtt_topic) VALUES (42, 50, 'DHT22+BME280', 'warehouse/sensor/42')`);
+            db.run(`INSERT OR IGNORE INTO sensor (id, bin_id, sensor_type, mqtt_topic) VALUES (43, 80, 'DHT22+BME280', 'warehouse/sensor/43')`);
+
+            console.log('✅ Зоны и датчики успешно привязаны');
+        }, 13000);
 
         console.log('🎉 Все товары успешно добавлены и привязаны к ячейкам');
     });
